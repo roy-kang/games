@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>扫雷</title>
+  <style>
+    .main {
+      width: 1000px;
+      margin: 0 auto;
+    }
+    .restart {
+      cursor: pointer;
+      font-size: 16px;
+      margin-left: 20px;
+    }
+    .container {
+      width: 752px;
+      padding: 20px;
+      background-color: #ccc;
+      border-radius: 5px;
+      position: relative;
+    }
+    .mask {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      z-index: 100;
+      display: none;
+    }
+    #canvas {
+      background-color: #bbb;
+    }
+  </style>
+</head>
+<body>
+  <div class="main">
+    <h3>扫雷 <span class="restart" onclick="mineSweeper.restart()">重新开始</span></h3>
+    <div class="container">
+      <div class="mask"></div>
+      <canvas id="canvas"></canvas>
+    </div>
+  </div>
+
+  <script>
+    class MineSweeper {
+      constructor() {
+        this.canvas = document.querySelector('#canvas')
+        this.mask = document.querySelector('.mask')
+        this.ctx = canvas.getContext('2d')
+
+        this.row = 20
+        this.col = 30
+        this.cellWidth = 25
+        this.cellHeight = 25
+
+        this.width = this.col * this.cellWidth
+        this.height = this.row * this.cellHeight
+
+        this.canvas.width = this.width
+        this.canvas.height = this.height
+        // 不同数字使用的不同颜色
+        this.colors = [
+          '#FF7F00',
+          '#00FF00',
+          '#FF0000',
+          '#00FFFF',
+          '#0000FF',
+          '#8B00FF',
+          '#297b83',
+          '#0b0733'
+        ]
+        this.mineTotal = 0 // 地雷总数
+        this.cellTotal = this.row * this.col // 单元格总数
+        // 方向数组
+        this.direction = [
+          -this.col,      // 上
+          this.col,       // 下
+          -1,             // 左
+          1,              // 右
+          -this.col - 1,  // 左上
+          this.col - 1,   // 左下
+          -this.col + 1,  // 右上
+          this.col + 1    // 右下
+        ]
+
+        this.restart()
+
+        // 监听点击事件
+        this.canvas.addEventListener('click', (e) => {
+          const cellIndex = this.calcMouseCell(e)
+          const cellValue = this.datas[cellIndex]
+          // 已标记和已标记的单元格都不能点击
+          if (this.mark[cellIndex] === 0) {
+            if (cellValue === -1) {
+              this.gameOver(cellIndex)
+            } else {
+              // 如果当前单元格的值为 0，则将周围的8个方向未点开的单元格都自定点开，并且递归
+              if (cellValue === 0) {
+                this.openCell(cellIndex)
+              } else {
+                this.mark[cellIndex] = 1
+                this.cellTotal--
+              }
+              this.draw()
+            }
+          }
+        })
+
+        // 自定义canvas右键，用来标记和解除标记
+        this.canvas.oncontextmenu = (e) => {
+          if (e.button === 2) {
+            const cellIndex = this.calcMouseCell(e)
+            // 判断是否已经点开，没点开就标记
+            if (this.mark[cellIndex] === 1) {
+              return false
+            }
+            if (this.mark[cellIndex] === 0) {
+              this.mark[cellIndex] = 2
+            } else {
+              this.mark[cellIndex] = 0
+            }
+            this.draw()
+          }
+          return false
+        }
+      }
+
+      restart() {
+        this.mineTotal = 0
+        this.cellTotal = this.row * this.col
+        this.mask.style.display = 'none'
+        // -1 为地雷
+        this.datas = new Array(this.cellTotal).fill(0).map(v => {
+          if (Math.random() > 0.8) {
+            this.mineTotal++
+            return -1
+          }
+          return 0
+        })
+        this.mark = new Array(this.cellTotal).fill(0) // 0 为未点开， 1 为点开， 2 为已标记
+        this.calcRound()
+
+        // 随机选择一个 0 的位置进行自动点开，作为起始位置
+        let randomIndex = Math.random() * this.datas.length | 0
+        while(this.datas[randomIndex] !== 0) {
+          randomIndex = Math.random() * this.datas.length | 0
+        }
+        this.openCell(randomIndex)
+        
+        this.draw()
+      }
+
+      // 递归打开数字为 0 的单元格的相邻单元格
+      openCell(cellIndex) {
+        const { datas, mark, direction } = this
+        mark[cellIndex] = 1
+        this.cellTotal--
+
+        for (let d of direction) {
+          const newIndex = cellIndex + d
+          if (this.isCross(cellIndex, newIndex, d, this.col, datas.length) || mark[newIndex] !== 0) continue
+
+          if (datas[newIndex] === 0) {
+            this.openCell(newIndex)
+          } else {
+            mark[newIndex] = 1
+            this.cellTotal--
+          }
+        }
+      }
+
+      // 根据鼠标事件得到点击位置
+      calcMouseCell(e) {
+        const row = e.offsetY / this.cellHeight | 0
+        const col = e.offsetX / this.cellWidth | 0
+        return row * this.col + col
+      }
+
+      // 计算地雷附近的提示数字
+      calcRound() {
+        const { datas, direction } = this
+        
+        for (let i = 0; i < datas.length; i++) {
+          if (datas[i] !== -1) {
+            for (let d of direction) {
+              const newIndex = i + d
+              // 边界判断
+              if (this.isCross(i, newIndex, d, this.col, datas.length)) continue
+
+              if (datas[newIndex] === -1) {
+                datas[i]++
+              }
+            }
+          }
+        }
+      }
+
+      // 单元格的边界判断
+      isCross(oriIndex, newIndex, d, col, maxLength) {
+        if (
+          newIndex < 0 || // 上边界
+          newIndex >= maxLength || // 下边界
+          (oriIndex % col === 0 && (d === -1 || d === -31 || d === 29)) || // 左边界
+          (oriIndex % col === col - 1 && (d === 1 || d === -29 || d === 31)) // 右边界
+        ) {
+          return true
+        }
+        return false
+      }
+
+      // 绘制
+      draw() {
+        this.canvas.height = this.height
+        this.drawLine()
+        this.drawMine()
+
+        if (this.isComplete()) {
+          setTimeout(() => {
+            this.mask.style.display = 'block'
+            alert('游戏完成')
+          })
+        }
+      }
+
+      // 绘制地雷数据
+      drawMine() {
+        const { datas, ctx, mark, cellWidth, cellHeight, col } = this
+        ctx.font = 'bold 18px "微软雅黑"'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'top'
+        for (let i = 0; i < datas.length; i++) {
+          if (mark[i] === 0) continue
+
+          const rowIndex = (i / col | 0) * cellWidth
+          const colIndex = i % col * cellHeight
+
+          if (mark[i] === 1) {
+            ctx.fillStyle = '#eee'
+            ctx.fillRect(colIndex + 2, rowIndex + 2, cellWidth - 4, cellHeight - 4)
+            // 不为 0 才显示数字
+            if (datas[i]) {
+              ctx.fillStyle = this.colors[datas[i] - 1]
+              ctx.fillText(datas[i], colIndex + 12, rowIndex + 6)
+            }
+          } else {
+            ctx.fillStyle = '#000'
+            ctx.fillText('?', colIndex + 12, rowIndex + 6)
+          }
+        }
+      }
+
+      // 绘制网格线
+      drawLine() {
+        const { ctx, row, col, width, height, cellWidth, cellHeight } = this
+        for (let i = 0; i <= row; i++) {
+          ctx.moveTo(0, i * cellWidth)
+          ctx.lineTo(width, i * cellWidth)
+        }
+        for (let i = 0; i <= col; i++) {
+          ctx.moveTo(i * cellHeight, 0)
+          ctx.lineTo(i * cellHeight, height)
+        }
+        ctx.lineWidth = 3
+        ctx.strokeStyle = '#ddd'
+        ctx.stroke()
+      }
+      
+      // 是否完成
+      isComplete() {
+        return this.cellTotal === this.mineTotal
+      }
+
+      /**
+       * 游戏结束将所有的地雷显示
+       * 1、正确的标记不动
+       * 2、将错误的标记打为红色的 X
+       * 3、将未标记的地雷显示 *
+       * 4、最后点击的地雷cell标记为红色背景
+       */
+      gameOver(lastCell) {
+        this.canvas.height = this.height
+        this.drawLine()
+        const { datas, ctx, mark, cellWidth, cellHeight, col } = this
+
+        ctx.font = 'bold 18px "微软雅黑"'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'top'
+        
+        for (let i = 0; i < datas.length; i++) {
+          const rowIndex = (i / col | 0) * cellWidth
+          const colIndex = i % col * cellHeight
+
+          if (mark[i] === 1) {
+            ctx.fillStyle = '#eee'
+            ctx.fillRect(colIndex + 2, rowIndex + 2, cellWidth - 4, cellHeight - 4)
+            if (datas[i]) {
+              ctx.fillStyle = this.colors[datas[i] - 1]
+              ctx.fillText(datas[i], colIndex + 12, rowIndex + 6)
+            }
+          } else {
+            if (datas[i] === -1) {
+              ctx.fillStyle = '#000'
+              if (mark[i] === 2) {
+                ctx.fillText('?', colIndex + 12, rowIndex + 6)
+              } else {
+                if (i === lastCell) {
+                  ctx.fillStyle = 'red'
+                  ctx.fillRect(colIndex + 2, rowIndex + 2, cellWidth - 4, cellHeight - 4)
+                  ctx.fillStyle = '#000'
+                  ctx.fillText('*', colIndex + 13, rowIndex + 9)
+                } else {
+                  ctx.fillText('*', colIndex + 13, rowIndex + 9)
+                }
+              }
+            } else if (mark[i] === 2) {
+              ctx.fillStyle = 'red'
+              ctx.fillText('x', colIndex + 12, rowIndex + 4)
+            }
+          }
+        }
+        this.mask.style.display = 'block'
+      }
+    }
+    var mineSweeper = new MineSweeper()
+  </script>
+</body>
+</html>
