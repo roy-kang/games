@@ -12,7 +12,9 @@ jobs:
 
     steps:
       - name: echo
-        run: echo ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          echo hello world
+          echo ${{ secrets.SSH_PRIVATE_KEY }}
         
       - name: Sync to Gitee
         uses: wearerequired/git-mirror-action@master
