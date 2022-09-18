@@ -1,0 +1,23 @@
+name: sync to pages
+
+on:
+  push:
+    branches: [ "main" ]
+
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Sync to Gitee
+        uses: wearerequired/git-mirror-action@master
+        env:
+          # 在 Settings->Secrets 配置 SSH_PRIVATE_KEY
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        with:
+          # GitHub 源仓库地址
+          source-repo: git@github.com:roy-kang/games.git
+          # Gitee 目标仓库地址
+          destination-repo: git@github.com:roy-kang/roy-kang.github.io.git
