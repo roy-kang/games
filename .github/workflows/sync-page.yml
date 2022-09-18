@@ -11,6 +11,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: echo
+        run: echo ${{ secrets.SSH_PRIVATE_KEY }}
+        
       - name: Sync to Gitee
         uses: wearerequired/git-mirror-action@master
         env:
@@ -21,3 +24,4 @@ jobs:
           source-repo: git@github.com:roy-kang/games.git
           # Gitee 目标仓库地址
           destination-repo: git@github.com:roy-kang/roy-kang.github.io.git
+
